@@ -4,33 +4,66 @@ import requests
 
 
 def get_scores():
-	teams = ["", "Atlanta Hawks","Boston Celtics","New Orleans Pelicans","Chicago Bulls","Cleveland Cavaliers","Dallas Mavericks","Denver Nuggets","Detroit Pistons","Golden State Warriors","Houston Rockets","Indiana Pacers","Los Angeles Clippers","Los Angeles Lakers","Miami Heat","Milwaukee Bucks","Minnesota Timberwolves","Brooklyn Nets","New York Knicks","Orlando Magic","Philadelphia 76ers"," Phoenix Suns","Portland Trail Blazers","Sacramento Kings","San Antonio Spurs","Oklahoma City Thunder","Utah Jazz","Washington Wizards","Toronto Raptors","Memphis Grizzlies","Charlotte Hornets"]
-	f = open('espn.html')
-	text = f.read()
-	# url = 'www.espn.com/nba/scores'
-	# r = requests,get(url)
-	# text = r.text
+	url = 'http://www.cbssports.com/nba/scoreboard/'
+	text = requests.get(url).text
 	soup = BeautifulSoup(text, 'html.parser')
 	scores = []
-	for scoreboard in soup.find_all('article', class_=['live']): # If I put basketball and scoreboard as classes, bs4 doesn't pick up on live. Displays finshed games
-	    datetime = scoreboard.find(class_='date-time').text
-	    m = re.match(r'(\d+:\d+) - (\d)', datetime)
-	    time = m.group(1) # time left in quarter
-	    quarter = int(m.group(2))
-	    away = teams[int(scoreboard['data-awayid'])]
-	    home = teams[int(scoreboard['data-homeid'])]
-	    away_score = int(scoreboard.find(class_='away').find(class_='total').text)
-	    home_score = int(scoreboard.find(class_='home').find(class_='total').text)
-	   	scores.push({'away' : away, 'home' : home, 'away_score' : away_score, 'home_score' : home_score, 'time': time, 'quarter' : quarter})
-	   	print(away, home, away_score, home_score, time, quarter)
-	return scores
+	games = soup.find_all(class_='live-update')
+	scores = []
+	for game in games:
+	    time_data = game.find(class_='game-status').text
+	    m = re.match(r'(\d)[\w]{2} (\d+:\d+)', time_data)
+	    if m:
+	        quarter = int(m.group(1))
+	        time = m.group(2) # time left in quarter
+	        live = True
+	    else: # Game is already over
+	        live = False
+	        quarter = 4
+	        time = 0 # Have to reset these variables somehow
+	    team_data = game.select('a.team')
+	    away, home = [el.text for el in team_data]
+	    scoreboard = game.find_all('td')
+	    away_score = int(scoreboard[5].text) 
+	    home_score = int(scoreboard[11].text)
+	    score = {'away' : away,
+	            'home' : home, 
+	            'away_score' : away_score, 
+	            'home_score' : home_score, 
+	            'live' : live   
+	            }
+	    if live:
+	        score['quarter'] = quarter
+	        score['time'] = time
+	    scores.append(score)
 
-def get_streams(home, away):
-	# Some code here to extract redditurl
-	redditurl = 'https://www.reddit.com/r/nbastreams/comments/686srv/game_thread_los_angeles_clippers_utah_jazz_223000/?st=j244m1mm&sh=f1098fb4'
-	r = requests.get(redditurl).text
-	soup = BeautifulSoup(r, 'html.parser')
+return scores
+
+def get_streams(url):
+	text = requests.get(url).text
+	soup = BeautifulSoup(text, 'html.parser')
 	modComment = soup.find('div', {'data-author':'StreamsBotMod'})
 	rows = modComment.find('table').find_all('tr')[1:]
-	links = [row.find_all('a')[1] for row in rows]
+	return [row.find_all('a')[1] for row in rows] # return links
     
+def get_threads(home, away):
+	# f = open('nbastreams.html')
+	# text = f.read()
+	url = 'https://www.reddit.com/r/nbastreams/'
+	text = requests.get(url).text
+	soup = BeautifulSoup(text, 'html.parser')
+	threads = soup.select('a.title')
+	for thread in threads:
+	    regex = away + ' @ ' + home
+	    if re.search(regex, thread.text):
+        	return get_streams(thread['href'])
+
+
+def main():
+	scores = get_scores()
+	for score in scores:
+		get_threads(score['home'], score['away'])
+
+
+
+
