@@ -38,7 +38,7 @@ def get_scores():
 	        score['time'] = time
 	    scores.append(score)
 
-return scores
+	return scores
 
 def get_streams(url):
 	text = requests.get(url).text
@@ -53,13 +53,13 @@ def get_threads(home, away):
 	soup = BeautifulSoup(text, 'html.parser')
 	threads = soup.select('a.title')
 	for thread in threads:
-	    regex = away + ' @ ' + home
+	    regex = '{} @ \w+ {}'.format(away, home) # Should probably eventually get full name but whatever
 	    if re.search(regex, thread.text):
         	return get_streams(thread['href'])
 
 def get_times(date): # Maybe we can pass in a date?
 	formatted_date = date.strftime('%m%d')
-	url = 'http://www.cbssports.com/nba/schedules/day/{}/post'.format(today)
+	url = 'http://www.cbssports.com/nba/schedules/day/{}/post'.format(formatted_date)
 
 	r = requests.get(url)
 	text = r.text
@@ -69,21 +69,24 @@ def get_times(date): # Maybe we can pass in a date?
 	times = []
 	for schedule in schedules:
 	    curr_date = schedule.find(class_='title').find('td').text.strip()
-	    if date == fulldate:
+	    if curr_date == fulldate:
 	        # Extract schedule
 	        rows = schedule.find_all('tr', class_=lambda x: x != 'title' and x != 'label')
 	        for row in rows:
+	        	# TODO check if the games are already over
 	            el = row.find(class_='gmtTime')
 	            gmt_time = int(el['data-gmt'])
 	            start_time = datetime.fromtimestamp(gmt_time)
-	            times.append(start_time)
-    			print(start_time)
-    return times
+	            print(start_time)
+	            times.append(start_time)	
+
+	return times
 
 def main():
-	scores = get_scores()
-	for score in scores:
-		get_threads(score['home'], score['away'])
+	# print(get_times(datetime(2017,5, 1)))
+	print(get_times(datetime.now()))
+
+main()
 
 
 
