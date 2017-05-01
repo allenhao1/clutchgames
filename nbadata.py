@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 import re
 import requests
+from datetime import datetime
 
 
 def get_scores():
@@ -47,8 +48,6 @@ def get_streams(url):
 	return [row.find_all('a')[1] for row in rows] # return links
     
 def get_threads(home, away):
-	# f = open('nbastreams.html')
-	# text = f.read()
 	url = 'https://www.reddit.com/r/nbastreams/'
 	text = requests.get(url).text
 	soup = BeautifulSoup(text, 'html.parser')
@@ -58,6 +57,28 @@ def get_threads(home, away):
 	    if re.search(regex, thread.text):
         	return get_streams(thread['href'])
 
+def get_times(date): # Maybe we can pass in a date?
+	formatted_date = date.strftime('%m%d')
+	url = 'http://www.cbssports.com/nba/schedules/day/{}/post'.format(today)
+
+	r = requests.get(url)
+	text = r.text
+	soup = BeautifulSoup(text, 'html.parser')
+	schedules = soup.find_all(class_='data')
+	fulldate = date.strftime('%A, %B %-d, %Y')
+	times = []
+	for schedule in schedules:
+	    curr_date = schedule.find(class_='title').find('td').text.strip()
+	    if date == fulldate:
+	        # Extract schedule
+	        rows = schedule.find_all('tr', class_=lambda x: x != 'title' and x != 'label')
+	        for row in rows:
+	            el = row.find(class_='gmtTime')
+	            gmt_time = int(el['data-gmt'])
+	            start_time = datetime.fromtimestamp(gmt_time)
+	            times.append(start_time)
+    			print(start_time)
+    return times
 
 def main():
 	scores = get_scores()
